@@ -115,12 +115,12 @@ export default function SignUp() {
               Account created! Please check your email to confirm and log in.
             </p>
             <p style={{ color: '#aaa', marginTop: '0.25rem' }}>
-              If you don’t see it, be sure to check your spam or junk folder.
+              If you don't see it, be sure to check your spam or junk folder.
             </p>
           </div>
 
           <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.875rem' }}>
-            Didn’t get the email?{' '}
+            Didn't get the email?{' '}
             <a
               href="#"
               onClick={handleResendConfirmation}
