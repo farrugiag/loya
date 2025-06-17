@@ -21,27 +21,27 @@ if (!merchantId) {
   return res.status(400).json({ error: 'Missing merchantId' });
 }
 
-const { data: merchant, error } = await supabase
-  .from('merchants')
+const { data: business, error } = await supabase
+  .from('businesses')
   .select('business_name, email, website, support_email, stripe_id')
   .eq('id', merchantId)
   .single();
 
 if (error) {
-  console.warn('Merchant fetch failed:', error.message);
+  console.warn('Business fetch failed:', error.message);
 }
 
 // ✅ Reuse account if already created
-if (merchant?.stripe_id) {
+if (business?.stripe_id) {
   const accountLink = await stripe.accountLinks.create({
-    account: merchant.stripe_id,
+    account: business.stripe_id,
     refresh_url: 'http://localhost:3000/reauth',
     return_url: 'http://localhost:3000/business/dashboard',
     type: 'account_onboarding',
   });
 
   return res.status(200).json({
-    accountId: merchant.stripe_id,
+    accountId: business.stripe_id,
     onboardingUrl: accountLink.url,
   });
 }
@@ -51,15 +51,15 @@ if (merchant?.stripe_id) {
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'US',
-      email: merchant?.email || undefined,
+      email: business?.email || undefined,
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
       business_profile: {
-        name: merchant?.business_name || undefined,
-        url: merchant?.website || undefined,
-        support_email: merchant?.support_email || merchant?.email || undefined,
+        name: business?.business_name || undefined,
+        url: business?.website || undefined,
+        support_email: business?.support_email || business?.email || undefined,
         product_description: 'Loyalty-enabled e-commerce store',
       },
       metadata: {
@@ -67,9 +67,9 @@ if (merchant?.stripe_id) {
       },
     });
 
-    // Save Stripe account ID to merchant
+    // Save Stripe account ID to business
     const { error: updateError } = await supabase
-      .from('merchants')
+      .from('businesses')
       .update({ stripe_id: account.id })
       .eq('id', merchantId);
 
@@ -90,8 +90,9 @@ if (merchant?.stripe_id) {
       accountId: account.id,
       onboardingUrl: accountLink.url,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error creating Stripe account:', err);
-    return res.status(500).json({ error: err.message });
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ error: message });
   }
 }
