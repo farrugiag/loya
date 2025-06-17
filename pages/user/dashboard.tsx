@@ -1,6 +1,9 @@
+// pages/user/dashboard.tsx
+
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/router';
+import useRoleGuard from '../../hooks/useRoleGuard';
 
 type Wallet = {
   id: string;
@@ -18,20 +21,36 @@ type Transaction = {
 };
 
 export default function Dashboard() {
+  const { checking, blocked, logoutAndReload } = useRoleGuard('user');
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
+    if (checking || blocked) return;
+
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/user/login');
         return;
       }
+
+      // Prevent business users from accessing this dashboard
+      const { data: bizCheck } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (bizCheck) {
+        logoutAndReload();
+        return;
+      }
+
       setUser(user);
 
       const { data: walletData } = await supabase
@@ -88,12 +107,26 @@ export default function Dashboard() {
     if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
       window.history.replaceState({}, document.title, '/dashboard');
     }
-  }, []);
+  }, [checking, blocked, router]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/user/login');
   };
+
+  if (checking) return <p style={{ color: 'white', padding: '2rem' }}>Checking access…</p>;
+
+  if (blocked) {
+    return (
+      <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
+        <h2>Access Denied</h2>
+        <p>You are not authorized to access the user dashboard.</p>
+        <button onClick={logoutAndReload} style={{ marginTop: '1rem', background: '#f87171', color: 'white', padding: '0.5rem 1rem', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
+          Log out
+        </button>
+      </div>
+    );
+  }
 
   if (!user || loading) {
     return (

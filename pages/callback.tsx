@@ -1,4 +1,3 @@
-// pages/callback.tsx
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabaseClient'
@@ -8,13 +7,14 @@ export default function Callback() {
   const { role } = router.query
 
   useEffect(() => {
-    if (!router.isReady) return
+    if (!router.isReady || typeof role !== 'string') return
 
     ;(async () => {
       const {
         data: { session },
         error: sessErr,
       } = await supabase.auth.getSession()
+
       if (sessErr || !session) {
         return router.replace(`/${role}/login`)
       }
@@ -22,7 +22,7 @@ export default function Callback() {
       // ───── BUSINESS SIGNUP ─────
       if (role === 'business') {
         const pendingName = localStorage.getItem('pending_business_name') || ''
-        const { data: bizUpsert, error: bizErr } = await supabase
+        const { error: bizErr } = await supabase
           .from('businesses')
           .upsert(
             {
@@ -33,66 +33,69 @@ export default function Callback() {
             { onConflict: 'id' }
           )
 
-        if (bizErr) console.error('Business upsert failed:', bizErr)
-        else console.log('Business upsert succeeded:', bizUpsert)
+        if (bizErr) console.error('❌ Business upsert failed:', bizErr)
+        else console.log('✅ Business created')
 
         localStorage.removeItem('pending_business_name')
+        return router.replace('/business/dashboard')
+      }
+
+      // ───── SAFEGUARD: Prevent creating user if ID exists in businesses ─────
+      const { data: bizCheck, error: bizCheckErr } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (bizCheckErr) {
+        console.error('❌ Error checking business existence:', bizCheckErr)
+        return router.replace('/error') // Optional
+      }
+
+      if (bizCheck) {
+        console.warn('⛔ User ID already exists as a business. Skipping user creation.')
         return router.replace('/business/dashboard')
       }
 
       // ───── USER SIGNUP ─────
       const userMeta = session.user.user_metadata
       let first = localStorage.getItem('pending_first_name') || ''
-      let last  = localStorage.getItem('pending_last_name')  || ''
+      let last = localStorage.getItem('pending_last_name') || ''
 
-      // If social signup and localStorage is empty, try to extract from full_name
       if (!first && userMeta.full_name) {
         const parts = userMeta.full_name.trim().split(' ')
         first = parts[0]
         last = parts.slice(1).join(' ') || ''
       }
-      
-      // 1. Base code
-        const base = first.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || session.user.email!.split('@')[0]
 
-        // 2. Find available referral code
-        let counter = 1
-        let code = base
+      const base = first.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || session.user.email!.split('@')[0]
+      let code = base
+      let counter = 1
 
-        while (true) {
-          const { count, error } = await supabase
-            .from('users')
-            .select('id', { count: 'exact', head: true })
-            .eq('referral_code', code)
+      while (true) {
+        const { count, error } = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .eq('referral_code', code)
 
-          if (error) {
-            console.error('Error checking referral_code:', error)
-            break
-          }
+        if (error || !count) break
+        counter++
+        code = `${base}${counter}`
+      }
 
-          if (!count || count === 0) break
-          counter += 1
-          code = `${base}${counter}`
-        }
+      const { error: userErr } = await supabase.from('users').upsert(
+        {
+          id: session.user.id,
+          email: session.user.email!,
+          first_name: first,
+          last_name: last,
+          referral_code: code,
+        },
+        { onConflict: 'id' }
+      )
 
-        console.log('✅ Unique referral code found:', code)
-
-
-        const { error: userErr } = await supabase
-        .from('users')
-        .upsert(
-          {
-            id: session.user.id,
-            email: session.user.email!,
-            first_name: first,
-            last_name: last,
-            referral_code: code,
-          },
-          { onConflict: 'id' }
-        )
-      
       if (userErr) console.error('❌ User upsert failed:', userErr)
-      
+      else console.log('✅ User created')
 
       localStorage.removeItem('pending_first_name')
       localStorage.removeItem('pending_last_name')
