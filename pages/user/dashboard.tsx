@@ -104,9 +104,9 @@ export default function Dashboard() {
 
     fetchData();
 
-    if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-      window.history.replaceState({}, document.title, '/dashboard');
-    }
+      if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+        window.history.replaceState({}, document.title, '/user/dashboard');
+      }
   }, [checking, blocked, router]);
 
   const handleLogout = async () => {
