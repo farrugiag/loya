@@ -34,7 +34,7 @@ export default function Login() {
       <div style={{ padding: '2rem', color: 'white', textAlign: 'center' }}>
         <h2>⚠️ You're already signed in</h2>
         <p>
-          You’re currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
+          You're currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
         </p>
         <button
           onClick={logoutAndReload}
@@ -79,7 +79,7 @@ export default function Login() {
         theme="dark"
       />
       <p style={{ textAlign: 'center', marginTop: 20 }}>
-        Don’t have an account?{' '}
+        Don't have an account?{' '}
         <a href="/user/signup" style={{ color: '#00c36d' }}>
           Sign up here
         </a>
