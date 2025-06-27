@@ -33,7 +33,7 @@ export default function Reauth() {
   return (
     <div style={{ color: 'white', padding: '2rem', textAlign: 'center' }}>
       <h2>Reinitializing onboarding…</h2>
-      <p>If you're not redirected automatically, <a onClick={() => router.reload()}>click here</a>.</p>
+      <p>If you&apos;re not redirected automatically, <a onClick={() => router.reload()}>click here</a>.</p>
     </div>
   );
 }

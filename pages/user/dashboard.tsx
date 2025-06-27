@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/router';
 import useRoleGuard from '../../hooks/useRoleGuard';
+import { User } from '@supabase/supabase-js';
 
 type Wallet = {
   id: string;
@@ -20,10 +21,14 @@ type Transaction = {
   business_name: string;
 };
 
+interface BusinessData {
+  business_name: string;
+}
+
 export default function Dashboard() {
   const { checking, blocked, logoutAndReload } = useRoleGuard('user');
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +82,7 @@ export default function Dashboard() {
         id: w.id,
         balance: w.balance,
         balance_from_referrals: w.balance_from_referrals,
-        business_name: (w.businesses as any)?.business_name ?? 'Unknown Store'
+        business_name: (w.businesses as unknown as BusinessData)?.business_name ?? 'Unknown Store'
       }));
 
       const formattedTransactions: Transaction[] = (transactionData ?? []).map(t => ({
@@ -85,7 +90,7 @@ export default function Dashboard() {
         amount: t.amount,
         cashback_earned: t.cashback_earned,
         created_at: t.created_at,
-        business_name: (t.businesses as any)?.business_name ?? 'Unknown Store'
+        business_name: (t.businesses as unknown as BusinessData)?.business_name ?? 'Unknown Store'
       }));
 
       setWallets(formattedWallets);
@@ -96,7 +101,7 @@ export default function Dashboard() {
         const isReferralOnly = w.balance === 0 && w.balance_from_referrals > 0;
         const notifiedKey = `referral-notified-${w.id}`;
         if (isReferralOnly && !localStorage.getItem(notifiedKey)) {
-          alert(`🎉 You’ve earned $${w.balance_from_referrals.toFixed(2)} from a friend at ${w.business_name}!`);
+          alert(`🎉 You've earned $${w.balance_from_referrals.toFixed(2)} from a friend at ${w.business_name}!`);
           localStorage.setItem(notifiedKey, 'true');
         }
       });
@@ -107,7 +112,7 @@ export default function Dashboard() {
       if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
         window.history.replaceState({}, document.title, '/user/dashboard');
       }
-  }, [checking, blocked, router]);
+  }, [checking, blocked, router, logoutAndReload]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

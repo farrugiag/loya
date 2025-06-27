@@ -4,6 +4,7 @@ import { Auth } from '@supabase/auth-ui-react'
 import { useRouter } from 'next/router'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
 import useRoleGuard from '../../hooks/useRoleGuard'
+import Link from 'next/link'
 
 export default function Login() {
   const { checking, blocked, logoutAndReload } = useRoleGuard('user')
@@ -32,9 +33,9 @@ export default function Login() {
   if (blocked) {
     return (
       <div style={{ padding: '2rem', color: 'white', textAlign: 'center' }}>
-        <h2>⚠️ You're already signed in</h2>
+        <h2>⚠️ You&apos;re already signed in</h2>
         <p>
-          You're currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
+          You&apos;re currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
         </p>
         <button
           onClick={logoutAndReload}
@@ -79,10 +80,10 @@ export default function Login() {
         theme="dark"
       />
       <p style={{ textAlign: 'center', marginTop: 20 }}>
-        Don't have an account?{' '}
-        <a href="/user/signup" style={{ color: '#00c36d' }}>
+        Don&apos;t have an account?{' '}
+        <Link href="/user/signup" style={{ color: '#00c36d' }}>
           Sign up here
-        </a>
+        </Link>
       </p>
     </div>
   )

@@ -36,9 +36,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Webhook signature verification failed:', errorMessage);
+    return res.status(400).send(`Webhook Error: ${errorMessage}`);
   }
 
   // Only listen for account updates

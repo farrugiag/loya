@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import Image from 'next/image'
+import Link from 'next/link'
 
 export default function SignUp() {
   const [email, setEmail] = useState('')
@@ -32,7 +34,7 @@ export default function SignUp() {
           last_name: lastName,
           full_name: `${firstName} ${lastName}`, // <- this fills in Display Name
         }
-      } as any
+      }
     })
 
     if (signUpError) {
@@ -100,7 +102,7 @@ export default function SignUp() {
         justifyContent: 'center',
         gap: '0.5rem'
       }}>
-        <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google logo" style={{ width: 16, height: 16 }} />
+        <Image src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google logo" width={16} height={16} />
         Continue with Google
       </button>
 
@@ -115,12 +117,12 @@ export default function SignUp() {
               Account created! Please check your email to confirm and log in.
             </p>
             <p style={{ color: '#aaa', marginTop: '0.25rem' }}>
-              If you don't see it, be sure to check your spam or junk folder.
+              If you don&apos;t see it, be sure to check your spam or junk folder.
             </p>
           </div>
 
           <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.875rem' }}>
-            Didn't get the email?{' '}
+            Didn&apos;t get the email?{' '}
             <a
               href="#"
               onClick={handleResendConfirmation}
@@ -171,7 +173,7 @@ export default function SignUp() {
 
       {!success && (
         <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.875rem' }}>
-          Already have an account? <a href="/user/login" style={{ color: '#00c36d' }}>Sign in</a>
+          Already have an account? <Link href="/user/login" style={{ color: '#00c36d' }}>Sign in</Link>
         </p>
       )}
     </div>

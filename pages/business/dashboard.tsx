@@ -2,10 +2,25 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import useRoleGuard from '../../hooks/useRoleGuard';
+import { User } from '@supabase/supabase-js';
+
+interface Transaction {
+  id: string;
+  created_at: string;
+  amount: string;
+  cashback_earned: string;
+  cashback_used: string;
+  referral_reward: string;
+  user?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+}
 
 export default function BusinessDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
@@ -13,7 +28,7 @@ export default function BusinessDashboard() {
   const [totalCashbackEarned, setTotalCashbackEarned] = useState<number | null>(null);
   const [totalCashbackUsed, setTotalCashbackUsed] = useState<number | null>(null);
   const [referralEarnings, setReferralEarnings] = useState<number | null>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const { checking, blocked, logoutAndReload } = useRoleGuard('business');
 
   useEffect(() => {
@@ -59,7 +74,7 @@ export default function BusinessDashboard() {
 
 
       if (!txError && txs) {
-        setTransactions(txs);
+        setTransactions(txs as unknown as Transaction[]);
         setTransactionCount(txs.length);
         setTotalCashbackUsed(txs.reduce((sum, tx) => sum + (parseFloat(tx.cashback_used) || 0), 0));
         setTotalCashbackEarned(txs.reduce((sum, tx) => sum + (parseFloat(tx.cashback_earned) || 0), 0));

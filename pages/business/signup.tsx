@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { useRouter } from 'next/router'
+import Link from 'next/link'
 
 export default function BusinessSignUp() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [businessName, setBusinessName] = useState('')
@@ -86,12 +85,12 @@ export default function BusinessSignUp() {
               Account created! Please check your email to confirm and log in.
             </p>
             <p style={{ color: '#aaa', marginTop: '0.25rem' }}>
-              If you don't see it, be sure to check your spam or junk folder.
+              If you don&apos;t see it, be sure to check your spam or junk folder.
             </p>
           </div>
 
           <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.875rem' }}>
-            Didn't get the email?{' '}
+            Didn&apos;t get the email?{' '}
             <a
               href="#"
               onClick={handleResendConfirmation}
@@ -137,7 +136,7 @@ export default function BusinessSignUp() {
 
       {!success && (
         <p style={{ textAlign: 'center', marginTop: 16, fontSize: '0.875rem' }}>
-          Already have a business account with Loya? <a href="/business/login" style={{ color: '#00c36d' }}>Sign in</a>
+          Already have a business account with Loya? <Link href="/business/login" style={{ color: '#00c36d' }}>Sign in</Link>
         </p>
       )}
     </div>
