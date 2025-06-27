@@ -22,8 +22,8 @@ export default function BusinessDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [stripeConnected, setStripeConnected] = useState(false);
-  const [connectingStripe, setConnectingStripe] = useState(false);
+  const [finixConnected, setFinixConnected] = useState(false);
+  const [connectingFinix, setConnectingFinix] = useState(false);
   const [transactionCount, setTransactionCount] = useState<number | null>(null);
   const [totalCashbackEarned, setTotalCashbackEarned] = useState<number | null>(null);
   const [totalCashbackUsed, setTotalCashbackUsed] = useState<number | null>(null);
@@ -34,7 +34,7 @@ export default function BusinessDashboard() {
   useEffect(() => {
     if (checking || blocked) return;
 
-    const getSessionAndCheckStripe = async () => {
+    const getSessionAndCheckFinix = async () => {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session) {
         router.replace('/business/login');
@@ -46,18 +46,17 @@ export default function BusinessDashboard() {
       // Fetch business (assuming business_id is auth.uid())
       const business_id = session.user.id;
 
-      // No need to fetch business row if business_id is auth.uid() for RLS
-      // But if you want to fetch for stripe, you can:
+      // Check Finix connection status
       const { data: business, error: bizError } = await supabase
         .from('businesses')
-        .select('stripe_id, stripe_details_submitted')
+        .select('finix_identity_id, finix_details_submitted')
         .eq('id', business_id)
         .single();
 
       if (bizError) {
         console.warn('Failed to fetch business:', bizError.message);
       } else {
-        setStripeConnected(!!business?.stripe_details_submitted);
+        setFinixConnected(!!business?.finix_details_submitted);
       }
 
       // Fetch transactions + client info
@@ -84,11 +83,11 @@ export default function BusinessDashboard() {
       setLoading(false);
     };
 
-    getSessionAndCheckStripe();
+    getSessionAndCheckFinix();
   }, [checking, blocked, router]);
 
-  const createStripeAccount = async () => {
-    setConnectingStripe(true);
+  const createFinixAccount = async () => {
+    setConnectingFinix(true);
 
     const res = await fetch('/api/account', {
       method: 'POST',
@@ -100,9 +99,9 @@ export default function BusinessDashboard() {
     if (res.ok && data.onboardingUrl) {
       window.location.href = data.onboardingUrl;
     } else {
-      console.error('Stripe onboarding error:', data.error);
-      alert('Stripe onboarding failed. Try again.');
-      setConnectingStripe(false);
+      console.error('Finix onboarding error:', data.error);
+      alert('Finix onboarding failed. Try again.');
+      setConnectingFinix(false);
     }
   };
 
@@ -153,26 +152,26 @@ export default function BusinessDashboard() {
           Welcome, <strong>{user.email}</strong>
         </p>
 
-        {stripeConnected ? (
+        {finixConnected ? (
           <p style={{ color: '#00c36d', marginBottom: '2rem' }}>
-            ✅ Your Stripe account is connected
+            ✅ Your Finix account is connected
           </p>
         ) : (
           <button
-            onClick={createStripeAccount}
-            disabled={connectingStripe}
+            onClick={createFinixAccount}
+            disabled={connectingFinix}
             style={{
               marginBottom: '2rem',
               padding: '0.75rem 1.5rem',
-              background: connectingStripe ? '#444' : '#635bff',
+              background: connectingFinix ? '#444' : '#635bff',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
               fontWeight: 'bold',
-              cursor: connectingStripe ? 'not-allowed' : 'pointer'
+              cursor: connectingFinix ? 'not-allowed' : 'pointer'
             }}
           >
-            {connectingStripe ? 'Connecting to Stripe…' : 'Connect Stripe'}
+            {connectingFinix ? 'Connecting to Finix…' : 'Connect Finix'}
           </button>
         )}
 
