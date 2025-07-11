@@ -29,6 +29,7 @@ export default function BusinessDashboard() {
   const [totalCashbackUsed, setTotalCashbackUsed] = useState<number | null>(null);
   const [referralEarnings, setReferralEarnings] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [showPaymentDemo, setShowPaymentDemo] = useState(false);
   const { checking, blocked, logoutAndReload } = useRoleGuard('business');
 
   useEffect(() => {
@@ -154,9 +155,36 @@ export default function BusinessDashboard() {
         </p>
 
         {stripeConnected ? (
-          <p style={{ color: '#00c36d', marginBottom: '2rem' }}>
-            ✅ Your Stripe account is connected
-          </p>
+          <div style={{ marginBottom: '2rem' }}>
+            <p style={{ color: '#00c36d', marginBottom: '1rem' }}>
+              ✅ Your Stripe account is connected
+            </p>
+            <div style={{ 
+              background: '#1e1e1e', 
+              padding: '1rem', 
+              borderRadius: '8px',
+              border: '1px solid #333'
+            }}>
+              <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>Test Payment</h3>
+              <p style={{ color: '#ccc', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                Use test card: 4242 4242 4242 4242
+              </p>
+              <button
+                onClick={() => setShowPaymentDemo(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#00c36d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Demo Payment
+              </button>
+            </div>
+          </div>
         ) : (
           <button
             onClick={createStripeAccount}
@@ -286,6 +314,97 @@ export default function BusinessDashboard() {
           Log out
         </button>
       </div>
+
+      {/* Payment Demo Modal */}
+      {showPaymentDemo && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#121212',
+            padding: '2rem',
+            borderRadius: '12px',
+            maxWidth: '500px',
+            width: '90%',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowPaymentDemo(false)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'none',
+                border: 'none',
+                color: '#888',
+                fontSize: '1.5rem',
+                cursor: 'pointer'
+              }}
+            >
+              ×
+            </button>
+            <h2 style={{ color: 'white', marginBottom: '1rem' }}>Test Payment</h2>
+            <p style={{ color: '#ccc', marginBottom: '1.5rem' }}>
+              This is a demo payment. Use test card number: 4242 4242 4242 4242
+            </p>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ color: 'white', display: 'block', marginBottom: '0.5rem' }}>
+                Amount ($)
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                defaultValue="10.00"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  backgroundColor: '#1a1a1a',
+                  color: 'white',
+                  border: '1px solid #444',
+                  borderRadius: '4px'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={() => setShowPaymentDemo(false)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#00c36d',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Process Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
