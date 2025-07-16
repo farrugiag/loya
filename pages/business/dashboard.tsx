@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import useRoleGuard from '../../hooks/useRoleGuard';
 import { User } from '@supabase/supabase-js';
+import Image from 'next/image';
 
 interface Transaction {
   id: string;
@@ -24,6 +25,7 @@ export default function BusinessDashboard() {
   const [loading, setLoading] = useState(true);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [transactionCount, setTransactionCount] = useState<number | null>(null);
   const [totalCashbackEarned, setTotalCashbackEarned] = useState<number | null>(null);
   const [totalCashbackUsed, setTotalCashbackUsed] = useState<number | null>(null);
@@ -107,257 +109,262 @@ export default function BusinessDashboard() {
     }
   };
 
-  if (checking) return <p style={{ color: 'white', padding: '2rem' }}>Checking access…</p>;
+  const handleLogout = async () => {
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+      }
+      router.push('/business/login');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      router.push('/business/login');
+    }
+  };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (blocked) {
     return (
-      <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
-        <h2>Access Denied</h2>
-        <p>You are not authorized to access the business dashboard.</p>
-        <button
-          onClick={logoutAndReload}
-          style={{
-            marginTop: '1rem',
-            background: '#f87171',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          Log out
-        </button>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="max-w-md w-full mx-auto p-8 text-center">
+          <div className="mb-6">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h2>
+            <p className="text-gray-600 mb-6">
+              You are not authorized to access the business dashboard.
+            </p>
+            <button
+              onClick={logoutAndReload}
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (loading || !user) {
-    return <p style={{ color: 'white', padding: '2rem' }}>Loading dashboard…</p>;
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
-      <div style={{
-        background: '#121212',
-        borderRadius: '16px',
-        padding: '2rem 3rem',
-        width: '100%',
-        maxWidth: '900px',
-        boxShadow: '0 0 20px rgba(0,0,0,0.5)',
-        textAlign: 'center'
-      }}>
-        <h1 style={{ color: 'white', fontSize: '1.75rem', marginBottom: '0.5rem' }}>
-          Business Dashboard
-        </h1>
-        <p style={{ color: '#ccc', marginBottom: '2rem' }}>
-          Welcome, <strong>{user.email}</strong>
-        </p>
+    <div className="min-h-screen bg-white font-sans">
+      {/* Header with Logo and User Info */}
+      <div className="border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center space-x-4">
+              <Image 
+                src="/loya-logo.svg" 
+                alt="Loya" 
+                width={128} 
+                height={128}
+                className="w-32 h-16"
+              />
+              <div>
+                <p className="text-sm text-gray-600">Welcome back, {user.email}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              disabled={signingOut}
+              className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {signingOut ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  <span>Signing out...</span>
+                </>
+              ) : (
+                <span>Sign out</span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
 
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stripe Connection Section */}
         {stripeConnected ? (
-          <div style={{ marginBottom: '2rem' }}>
-            <p style={{ color: '#00c36d', marginBottom: '1rem' }}>
-              ✅ Your Stripe account is connected
-            </p>
-            <div style={{ 
-              background: '#1e1e1e', 
-              padding: '1rem', 
-              borderRadius: '8px',
-              border: '1px solid #333'
-            }}>
-              <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>Test Payment</h3>
-              <p style={{ color: '#ccc', fontSize: '0.875rem', marginBottom: '1rem' }}>
-                Use test card: 4242 4242 4242 4242
+          <div className="mb-8">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <div className="text-green-600 mr-3">✅</div>
+                <div>
+                  <p className="text-green-800 font-medium">Your Stripe account is connected</p>
+                  <p className="text-green-700 text-sm">You can now accept payments and process cashback</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Test Payment</h3>
+              <p className="text-gray-600 text-sm mb-4">
+                Use test card: <code className="bg-gray-100 px-2 py-1 rounded">4242 4242 4242 4242</code>
               </p>
               <button
                 onClick={() => setShowPaymentDemo(true)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#00c36d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem'
-                }}
+                className="bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-2 px-4 rounded-lg transition-colors"
               >
                 Demo Payment
               </button>
             </div>
           </div>
         ) : (
-          <button
-            onClick={createStripeAccount}
-            disabled={connectingStripe}
-            style={{
-              marginBottom: '2rem',
-              padding: '0.75rem 1.5rem',
-              background: connectingStripe ? '#444' : '#635bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 'bold',
-              cursor: connectingStripe ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {connectingStripe ? 'Connecting to Stripe…' : 'Connect Stripe'}
-          </button>
+          <div className="mb-8">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <div className="text-yellow-600 mr-3">⚠️</div>
+                <div>
+                  <p className="text-yellow-800 font-medium">Stripe account not connected</p>
+                  <p className="text-yellow-700 text-sm">Connect your Stripe account to start accepting payments</p>
+                </div>
+              </div>
+            </div>
+            
+            <button
+              onClick={createStripeAccount}
+              disabled={connectingStripe}
+              className="w-full bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              {connectingStripe ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Connecting to Stripe...</span>
+                </>
+              ) : (
+                <span>Connect Stripe</span>
+              )}
+            </button>
+          </div>
         )}
 
-        {/* Stats */}
-        <div style={{ marginTop: '2rem', textAlign: 'left', color: 'white' }}>
-          <h2 style={{ color: '#00c36d', fontSize: '1.25rem', marginBottom: '1.5rem' }}>
-            Your Stats
-          </h2>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '1rem'
-          }}>
-            <div style={{ background: '#1e1e1e', padding: '1rem', borderRadius: '8px' }}>
-              <p style={{ marginBottom: '0.5rem', color: '#888' }}>Total Transactions</p>
-              <p style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>{transactionCount ?? '—'}</p>
+        {/* Stats Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Stats</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <p className="text-sm text-gray-600 mb-1">Total Transactions</p>
+              <p className="text-2xl font-bold text-[#21431E]">{transactionCount ?? '—'}</p>
             </div>
-            <div style={{ background: '#1e1e1e', padding: '1rem', borderRadius: '8px' }}>
-              <p style={{ marginBottom: '0.5rem', color: '#888' }}>Cashback Given to Users</p>
-              <p style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>${totalCashbackEarned?.toFixed(2) ?? '—'}</p>
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <p className="text-sm text-gray-600 mb-1">Cashback Given to Users</p>
+              <p className="text-2xl font-bold text-[#21431E]">${totalCashbackEarned?.toFixed(2) ?? '—'}</p>
             </div>
-            <div style={{ background: '#1e1e1e', padding: '1rem', borderRadius: '8px' }}>
-              <p style={{ marginBottom: '0.5rem', color: '#888' }}>Cashback Redeemed by Users</p>
-              <p style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>${totalCashbackUsed?.toFixed(2) ?? '—'}</p>
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <p className="text-sm text-gray-600 mb-1">Cashback Redeemed by Users</p>
+              <p className="text-2xl font-bold text-[#21431E]">${totalCashbackUsed?.toFixed(2) ?? '—'}</p>
             </div>
-            <div style={{ background: '#1e1e1e', padding: '1rem', borderRadius: '8px' }}>
-              <p style={{ marginBottom: '0.5rem', color: '#888' }}>Referral Rewards Given</p>
-              <p style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>${referralEarnings?.toFixed(2) ?? '—'}</p>
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <p className="text-sm text-gray-600 mb-1">Referral Rewards Given</p>
+              <p className="text-2xl font-bold text-[#21431E]">${referralEarnings?.toFixed(2) ?? '—'}</p>
             </div>
           </div>
         </div>
 
-        {/* Transaction History Table or Empty State */}
-        <div style={{ marginTop: '3rem', color: 'white' }}>
-          <h2 style={{ color: '#00c36d', fontSize: '1.15rem', marginBottom: '1rem' }}>
-            Transaction History
-          </h2>
+        {/* Transaction History Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Transaction History</h2>
           {transactions && transactions.length > 0 ? (
-            <div style={{ overflowX: 'auto', borderRadius: '12px', boxShadow: '0 2px 8px #0002', background: '#1e1e1e' }}>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, color: '#eee', fontSize: '0.98rem' }}>
-                <thead>
-                  <tr style={{ background: '#222' }}>
-                    <th style={{ padding: '0.7rem', textAlign: 'left', fontWeight: 700, letterSpacing: '0.01em', borderBottom: '2px solid #222' }}>Date</th>
-                    <th style={{ padding: '0.7rem', textAlign: 'left', fontWeight: 700, borderBottom: '2px solid #222' }}>Client</th>
-                    <th style={{ padding: '0.7rem', textAlign: 'right', fontWeight: 700, borderBottom: '2px solid #222' }}>Amount</th>
-                    <th style={{ padding: '0.7rem', textAlign: 'right', fontWeight: 700, borderBottom: '2px solid #222' }}>Cashback Earned</th>
-                    <th style={{ padding: '0.7rem', textAlign: 'right', fontWeight: 700, borderBottom: '2px solid #222' }}>Cashback Redeemed</th>
-                    <th style={{ padding: '0.7rem', textAlign: 'right', fontWeight: 700, borderBottom: '2px solid #222' }}>Referral Reward</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map(tx => (
-                    <tr
-                      key={tx.id}
-                      style={{
-                        transition: 'background 0.2s',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #222'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.background = '#23272a'}
-                      onMouseOut={e => e.currentTarget.style.background = ''}
-                    >
-                      <td style={{ padding: '0.6rem 0.7rem', textAlign: 'left' }}>
-                        {new Date(tx.created_at).toLocaleDateString()}<br />
-                        <span style={{ fontSize: '0.87em', color: '#aaa' }}>{new Date(tx.created_at).toLocaleTimeString()}</span>
-                      </td>
-                      <td style={{ padding: '0.6rem 0.7rem', textAlign: 'left' }}>
-                        {tx.user?.first_name || ''} {tx.user?.last_name || ''}
-                        {(!tx.user?.first_name && !tx.user?.last_name) && tx.user?.email
-                          ? <span style={{ color: '#aaa' }}>{tx.user.email}</span>
-                          : ''}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.7rem', textAlign: 'right' }}>
-                        ${Number(tx.amount ?? 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.7rem', textAlign: 'right' }}>
-                        ${Number(tx.cashback_earned ?? 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.7rem', textAlign: 'right' }}>
-                        ${Number(tx.cashback_used ?? 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.7rem', textAlign: 'right' }}>
-                        ${Number(tx.referral_reward ?? 0).toFixed(2)}
-                      </td>
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cashback Earned</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cashback Redeemed</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Referral Reward</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {transactions.map(tx => (
+                      <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div>
+                            {new Date(tx.created_at).toLocaleDateString()}
+                            <div className="text-xs text-gray-500">
+                              {new Date(tx.created_at).toLocaleTimeString()}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {tx.user?.first_name || ''} {tx.user?.last_name || ''}
+                          {(!tx.user?.first_name && !tx.user?.last_name) && tx.user?.email && (
+                            <div className="text-xs text-gray-500">{tx.user.email}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          ${Number(tx.amount ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right font-medium">
+                          ${Number(tx.cashback_earned ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          ${Number(tx.cashback_used ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-medium">
+                          ${Number(tx.referral_reward ?? 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
-            <p style={{ color: '#aaa', textAlign: 'center', marginTop: '2rem' }}>
-              No transactions found yet.
-            </p>
+            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <div className="text-4xl mb-4">📊</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
+              <p className="text-gray-600">
+                Your transaction history will appear here once you start accepting payments.
+              </p>
+            </div>
           )}
         </div>
-
-        <button
-          onClick={logoutAndReload}
-          style={{
-            marginTop: '2.5rem',
-            padding: '0.5rem 1.25rem',
-            background: '#00c36d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontWeight: 'bold',
-            cursor: 'pointer'
-          }}
-        >
-          Log out
-        </button>
       </div>
 
       {/* Payment Demo Modal */}
       {showPaymentDemo && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: '#121212',
-            padding: '2rem',
-            borderRadius: '12px',
-            maxWidth: '500px',
-            width: '90%',
-            position: 'relative'
-          }}>
-            <button
-              onClick={() => setShowPaymentDemo(false)}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'none',
-                border: 'none',
-                color: '#888',
-                fontSize: '1.5rem',
-                cursor: 'pointer'
-              }}
-            >
-              ×
-            </button>
-            <h2 style={{ color: 'white', marginBottom: '1rem' }}>Test Payment</h2>
-            <p style={{ color: '#ccc', marginBottom: '1.5rem' }}>
-              This is a demo payment. Use test card number: 4242 4242 4242 4242
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Test Payment</h2>
+              <button
+                onClick={() => setShowPaymentDemo(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-gray-600 mb-4">
+              This is a demo payment. Use test card number: <code className="bg-gray-100 px-2 py-1 rounded">4242 4242 4242 4242</code>
             </p>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ color: 'white', display: 'block', marginBottom: '0.5rem' }}>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Amount ($)
               </label>
               <input
@@ -365,40 +372,17 @@ export default function BusinessDashboard() {
                 min="1"
                 step="0.01"
                 defaultValue="10.00"
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  backgroundColor: '#1a1a1a',
-                  color: 'white',
-                  border: '1px solid #444',
-                  borderRadius: '4px'
-                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#21431E] focus:border-transparent"
               />
             </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowPaymentDemo(false)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
-              <button
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#00c36d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
+              <button className="flex-1 bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-2 px-4 rounded-lg transition-colors">
                 Process Payment
               </button>
             </div>

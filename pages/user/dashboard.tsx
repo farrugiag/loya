@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/router';
 import useRoleGuard from '../../hooks/useRoleGuard';
 import { User } from '@supabase/supabase-js';
+import Image from 'next/image';
 
 type Wallet = {
   id: string;
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -109,134 +111,268 @@ export default function Dashboard() {
 
     fetchData();
 
-      if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-        window.history.replaceState({}, document.title, '/user/dashboard');
-      }
+    if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+      window.history.replaceState({}, document.title, '/user/dashboard');
+    }
   }, [checking, blocked, router, logoutAndReload]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/user/login');
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+        // Still redirect even if there's an error
+      }
+      router.push('/user/login');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      // Still redirect even if there's an error
+      router.push('/user/login');
+    }
   };
 
-  if (checking) return <p style={{ color: 'white', padding: '2rem' }}>Checking access…</p>;
+  const scrollWallets = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 340; // card width + gap
+      const currentScroll = scrollContainerRef.current.scrollLeft;
+      const newScroll = direction === 'left' 
+        ? currentScroll - scrollAmount 
+        : currentScroll + scrollAmount;
+      
+      scrollContainerRef.current.scrollTo({
+        left: newScroll,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (blocked) {
     return (
-      <div style={{ color: 'white', textAlign: 'center', padding: '2rem' }}>
-        <h2>Access Denied</h2>
-        <p>You are not authorized to access the user dashboard.</p>
-        <button onClick={logoutAndReload} style={{ marginTop: '1rem', background: '#f87171', color: 'white', padding: '0.5rem 1rem', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
-          Log out
-        </button>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="max-w-md w-full mx-auto p-8 text-center">
+          <div className="mb-6">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h2>
+            <p className="text-gray-600 mb-6">
+              You are not authorized to access the user dashboard.
+            </p>
+            <button
+              onClick={logoutAndReload}
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!user || loading) {
     return (
-      <div style={{ padding: '2rem', color: 'white' }}>
-        <h2>Loading your wallet...</h2>
-        <div style={{ background: '#222', height: '60px', width: '100%', marginBottom: '1rem', borderRadius: '8px' }} />
-        <div style={{ background: '#222', height: '20px', width: '100px', borderRadius: '4px' }} />
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your wallet...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '2rem', color: 'white' }}>
-      <h1 style={{ marginBottom: '1.5rem' }}>Welcome, {user.email}</h1>
-
-      {/* Wallets Carousel */}
-      <div
-        ref={scrollContainerRef}
-        style={{
-          display: 'flex',
-          overflowX: 'auto',
-          scrollSnapType: 'x mandatory',
-          gap: '1rem',
-          paddingBottom: '1rem',
-        }}
-      >
-        {wallets.map(w => {
-          const isEmptyPlaceholder = w.id === 'empty-wallet-placeholder';
-          const isReferralOnly = w.balance === 0 && w.balance_from_referrals > 0;
-
-          return (
-            <div
-              key={w.id}
-              style={{
-                width: '300px',
-                minHeight: '160px',
-                background: '#111',
-                padding: '1.5rem',
-                borderRadius: '8px',
-                flexShrink: 0,
-                scrollSnapAlign: 'start',
-                overflow: 'hidden',
-                opacity: isEmptyPlaceholder ? 0.6 : 1,
-              }}
-            >
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                👜 {w.business_name}
-              </h2>
-              <p style={{ fontSize: '2rem', color: '#00c36d', margin: 0 }}>
-                ${w.balance.toFixed(2)}
-              </p>
-              <p style={{ fontSize: '0.875rem', color: '#00c36d', fontWeight: 'bold', marginTop: '0.25rem' }}>
-                +${w.balance_from_referrals.toFixed(2)} from referrals
-              </p>
-
-              {isReferralOnly && (
-                <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#aaa' }}>
-                  🧠 This wallet was created because someone you referred made a purchase at this business!
-                </p>
-              )}
-
-              {isEmptyPlaceholder && (
-                <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#888' }}>
-                  Your wallet will appear here once you make your first purchase!
-                </p>
-              )}
+    <div className="min-h-screen bg-white font-sans">
+      {/* Header with Logo and User Info */}
+      <div className="border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <div className="flex items-center space-x-4">
+              <Image 
+                src="/loya-logo.svg" 
+                alt="Loya" 
+                width={128} 
+                height={128}
+                className="w-32 h-16"
+              />
+              <div>
+                <p className="text-sm text-gray-600">Welcome back, {user.email}</p>
+              </div>
             </div>
-          );
-        })}
+            <button
+              onClick={handleLogout}
+              disabled={signingOut}
+              className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {signingOut ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                  <span>Signing out...</span>
+                </>
+              ) : (
+                <span>Sign out</span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Transactions */}
-      <h3 style={{ marginBottom: '1rem' }}>📋 Recent Transactions</h3>
-      {transactions.length > 0 ? (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {transactions.map(txn => (
-            <li key={txn.id} style={{ padding: '1rem 0', borderBottom: '1px solid #333' }}>
-              <div style={{ fontWeight: 'bold' }}>{txn.business_name}</div>
-              <div>Purchase: ${txn.amount.toFixed(2)}</div>
-              <div>Cashback: ${txn.cashback_earned.toFixed(2)}</div>
-              <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                {new Date(txn.created_at).toLocaleDateString()}
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p style={{ color: '#aaa' }}>No transactions yet.</p>
-      )}
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Wallets Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Wallets</h2>
+          
+          {/* Wallet Navigation Container */}
+          <div className="relative">
+            {/* Left Arrow */}
+            {wallets.length > 1 && (
+              <button
+                onClick={() => scrollWallets('left')}
+                className="absolute -left-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
 
-      {/* Logout */}
-      <button
-        onClick={handleLogout}
-        style={{
-          marginTop: '2rem',
-          padding: '0.5rem 1rem',
-          background: '#444',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-        }}
-      >
-        Log out
-      </button>
+            {/* Right Arrow */}
+            {wallets.length > 1 && (
+              <button
+                onClick={() => scrollWallets('right')}
+                className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+
+            {/* Wallet Cards Container */}
+            <div
+              ref={scrollContainerRef}
+              className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide"
+              style={{
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
+              {wallets.map(w => {
+                const isEmptyPlaceholder = w.id === 'empty-wallet-placeholder';
+                const isReferralOnly = w.balance === 0 && w.balance_from_referrals > 0;
+
+                return (
+                  <div
+                    key={w.id}
+                    className={`min-w-[320px] max-w-[320px] bg-white border border-gray-200 rounded-lg p-6 flex-shrink-0 ${
+                      isEmptyPlaceholder ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-medium text-gray-900 truncate">
+                        {w.business_name}
+                      </h3>
+                      <span className="text-2xl">👜</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm text-gray-600">Available Balance</p>
+                        <p className="text-2xl font-bold text-[#21431E]">
+                          ${w.balance.toFixed(2)}
+                        </p>
+                      </div>
+                      
+                      {w.balance_from_referrals > 0 && (
+                        <div>
+                          <p className="text-sm text-gray-600">From Referrals</p>
+                          <p className="text-lg font-semibold text-green-600">
+                            +${w.balance_from_referrals.toFixed(2)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {isReferralOnly && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-xs text-blue-700">
+                          🧠 This wallet was created because someone you referred made a purchase at this business!
+                        </p>
+                      </div>
+                    )}
+
+                    {isEmptyPlaceholder && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-600">
+                          Your wallet will appear here once you make your first purchase!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Transactions Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h2>
+          {transactions.length > 0 ? (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              {transactions.map((txn, index) => (
+                <div
+                  key={txn.id}
+                  className={`flex items-center justify-between p-4 ${
+                    index !== transactions.length - 1 ? 'border-b border-gray-100' : ''
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-[#21431E] rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">$</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{txn.business_name}</p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(txn.created_at).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-gray-900">-${txn.amount.toFixed(2)}</p>
+                    <p className="text-sm text-green-600 font-medium">
+                      +${txn.cashback_earned.toFixed(2)} cashback
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <div className="text-4xl mb-4">📋</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
+              <p className="text-gray-600">
+                Your transaction history will appear here once you make your first purchase.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

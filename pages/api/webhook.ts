@@ -1,108 +1,81 @@
 // pages/api/webhook.ts
 
-import type { NextApiRequest, NextApiResponse } from 'next';
-import Stripe from 'stripe';
 import { buffer } from 'micro';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { stripe } from '../../lib/utils';
 import { createClient } from '@supabase/supabase-js';
-
-export const config = {
-  api: {
-    bodyParser: false, // Needed for Stripe signature verification
-  },
-};
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-08-16',
-});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).send('Method Not Allowed');
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const sig = req.headers['stripe-signature']!;
   const buf = await buffer(req);
+  const sig = req.headers['stripe-signature'] as string;
 
-  let event: Stripe.Event;
+  let event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      buf,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Webhook signature verification failed:', errorMessage);
-    return res.status(400).send(`Webhook Error: ${errorMessage}`);
+    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err);
+    return res.status(400).json({ error: 'Invalid signature' });
   }
 
-  // Handle different event types
-  switch (event.type) {
-    case 'account.updated':
-      const account = event.data.object as Stripe.Account;
+  try {
+    switch (event.type) {
+      case 'account.updated':
+        const account = event.data.object;
+        
+        // Update business record when Stripe account is updated
+        if (account.details_submitted) {
+          const { error } = await supabase
+            .from('businesses')
+            .update({ 
+              stripe_details_submitted: true,
+              stripe_charges_enabled: account.charges_enabled,
+              stripe_payouts_enabled: account.payouts_enabled
+            })
+            .eq('stripe_id', account.id);
 
-      if (account.details_submitted && account.metadata?.merchantId) {
-        const { error } = await supabase
-          .from('businesses')
-          .update({ stripe_details_submitted: true })
-          .eq('id', account.metadata.merchantId);
-
-        if (error) {
-          console.error('Failed to update merchant onboarding status:', error.message);
-          return res.status(500).send('Failed to update status');
+          if (error) {
+            console.error('Failed to update business Stripe status:', error);
+          } else {
+            console.log('Updated business Stripe status for account:', account.id);
+          }
         }
+        break;
 
-        console.log(`✅ Stripe onboarding completed for merchant ${account.metadata.merchantId}`);
-      }
-      break;
+      case 'payment_intent.succeeded':
+        // Handle successful payments
+        const paymentIntent = event.data.object;
+        console.log('Payment succeeded:', paymentIntent.id);
+        break;
 
-    case 'payment_intent.succeeded':
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const { businessId, userId, description } = paymentIntent.metadata;
+      case 'payment_intent.payment_failed':
+        // Handle failed payments
+        const failedPayment = event.data.object;
+        console.log('Payment failed:', failedPayment.id);
+        break;
 
-      if (businessId && userId) {
-        // Calculate cashback (example: 5% of transaction amount)
-        const amount = paymentIntent.amount / 100; // Convert from cents
-        const cashbackAmount = amount * 0.05;
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
 
-        // Record transaction in database
-        const { error: txError } = await supabase
-          .from('transactions')
-          .insert({
-            id: paymentIntent.id,
-            business_id: businessId,
-            user_id: userId,
-            amount: amount.toString(),
-            cashback_earned: cashbackAmount.toString(),
-            cashback_used: '0',
-            referral_reward: '0',
-            status: 'completed',
-            stripe_payment_intent_id: paymentIntent.id,
-          });
-
-        if (txError) {
-          console.error('Failed to record transaction:', txError.message);
-          return res.status(500).send('Failed to record transaction');
-        }
-
-        console.log(`✅ Payment completed: ${paymentIntent.id} for business ${businessId}`);
-      }
-      break;
-
-    case 'payment_intent.payment_failed':
-      const failedPayment = event.data.object as Stripe.PaymentIntent;
-      console.log(`❌ Payment failed: ${failedPayment.id} - ${failedPayment.last_payment_error?.message}`);
-      break;
-
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+    res.status(500).json({ error: 'Webhook handler failed' });
   }
-
-  res.status(200).send('Webhook received');
 }
