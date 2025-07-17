@@ -59,8 +59,8 @@ export default function Login() {
         password
       })
       if (error) throw error
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to sign in')
     } finally {
       setLoading(false)
     }
@@ -83,9 +83,9 @@ export default function Login() {
         <div className="max-w-md w-full mx-auto p-8 text-center">
           <div className="mb-6">
             <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">You're already signed in</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">You&apos;re already signed in</h2>
             <p className="text-gray-600 mb-6">
-              You're currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
+              You&apos;re currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
             </p>
             <button
               onClick={logoutAndReload}
@@ -218,7 +218,7 @@ export default function Login() {
 
           {/* Sign up link */}
           <p className="text-center mt-4 text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/user/signup" className="text-[#21431E] hover:text-[#1a3618] font-medium">
               Sign up here
             </Link>

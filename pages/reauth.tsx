@@ -63,7 +63,7 @@ export default function Reauth() {
           {/* Help Text */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <p className="text-gray-700 text-sm">
-              If you're not redirected automatically,{' '}
+              If you&apos;re not redirected automatically,{' '}
               <button 
                 onClick={() => router.reload()} 
                 className="text-[#21431E] hover:text-[#1a3618] font-medium underline"

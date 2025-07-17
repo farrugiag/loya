@@ -104,12 +104,12 @@ export default function BusinessSignUp() {
                 Account created! Please check your email to confirm and log in.
               </p>
               <p className="text-green-700 text-xs mt-1">
-                If you don't see it, be sure to check your spam or junk folder.
+                If you don&apos;t see it, be sure to check your spam or junk folder.
               </p>
             </div>
 
             <p className="text-center text-sm text-gray-600">
-              Didn't get the email?{' '}
+              Didn&apos;t get the email?{' '}
               <button
                 onClick={handleResendConfirmation}
                 disabled={resendCooldown}

@@ -39,8 +39,8 @@ export default function BusinessLogin() {
         password
       })
       if (error) throw error
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to sign in')
     } finally {
       setLoading(false)
     }
@@ -65,7 +65,7 @@ export default function BusinessLogin() {
             <div className="text-4xl mb-4">⚠️</div>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">Already signed in</h2>
             <p className="text-gray-600 mb-6">
-              You're signed in as a <strong>user</strong>. Please log out first.
+              You&apos;re signed in as a <strong>user</strong>. Please log out first.
             </p>
             <button
               onClick={logoutAndReload}
@@ -173,7 +173,7 @@ export default function BusinessLogin() {
 
           {/* Sign up link */}
           <p className="text-center mt-4 text-sm text-gray-600">
-            Don't have a business account?{' '}
+            Don&apos;t have a business account?{' '}
             <Link href="/business/signup" className="text-[#21431E] hover:text-[#1a3618] font-medium">
               Sign up here
             </Link>

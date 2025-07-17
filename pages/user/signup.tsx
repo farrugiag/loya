@@ -115,7 +115,7 @@ export default function SignUp() {
             {/* Success Message */}
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans">Check your email</h1>
-              <p className="text-gray-600 text-sm font-sans">We've sent you a confirmation link</p>
+              <p className="text-gray-600 text-sm font-sans">We&apos;ve sent you a confirmation link</p>
             </div>
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
@@ -123,12 +123,12 @@ export default function SignUp() {
                 Account created! Please check your email to confirm and log in.
               </p>
               <p className="text-green-700 text-xs mt-1">
-                If you don't see it, be sure to check your spam or junk folder.
+                If you don&apos;t see it, be sure to check your spam or junk folder.
               </p>
             </div>
 
             <p className="text-center text-sm text-gray-600">
-              Didn't get the email?{' '}
+              Didn&apos;t get the email?{' '}
               <button
                 onClick={handleResendConfirmation}
                 disabled={resendCooldown}
