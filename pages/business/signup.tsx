@@ -96,7 +96,7 @@ export default function BusinessSignUp() {
             {/* Success Message */}
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans">Check your email</h1>
-              <p className="text-gray-600 text-sm font-sans">We've sent you a confirmation link</p>
+              <p className="text-gray-600 text-sm font-sans">We&apos;ve sent you a confirmation link</p>
             </div>
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
