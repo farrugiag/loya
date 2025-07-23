@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import Image from 'next/image'
 import Link from 'next/link'
+import { getAppUrl } from '../../lib/utils'
 
 export default function SignUp() {
   const [email, setEmail] = useState('')
@@ -21,7 +22,7 @@ export default function SignUp() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'http://localhost:3000/callback?role=user'
+          redirectTo: `${getAppUrl()}/callback?role=user`
         }
       })
       if (error) throw error
@@ -47,7 +48,7 @@ export default function SignUp() {
       email,
       password,
       options: {
-        emailRedirectTo: 'http://localhost:3000/callback?role=user',
+        emailRedirectTo: `${getAppUrl()}/callback?role=user`,
         data: {
           first_name: firstName,
           last_name: lastName,

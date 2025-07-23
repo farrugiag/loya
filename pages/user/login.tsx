@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import useRoleGuard from '../../hooks/useRoleGuard'
 import Link from 'next/link'
 import Image from 'next/image'
+import { getAppUrl } from '../../lib/utils'
 
 export default function Login() {
   const { checking, blocked, logoutAndReload } = useRoleGuard('user')
@@ -32,7 +33,7 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'http://localhost:3000/callback?role=user'
+          redirectTo: `${getAppUrl()}/callback?role=user`
         }
       })
       if (error) throw error

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import Link from 'next/link'
 import Image from 'next/image'
+import { getAppUrl } from '../../lib/utils'
 
 export default function BusinessSignUp() {
   const [email, setEmail] = useState('')
@@ -28,7 +29,7 @@ export default function BusinessSignUp() {
       email,
       password,
       options: {
-        emailRedirectTo: 'http://localhost:3000/callback?role=business',
+        emailRedirectTo: `${getAppUrl()}/callback?role=business`,
         data: {
           role: 'business',
           business_name: businessName,

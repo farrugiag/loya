@@ -1,7 +1,7 @@
 // pages/api/account.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { stripe } from '../../lib/utils';
+import { stripe, getAppUrl } from '../../lib/utils';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -35,8 +35,8 @@ if (error) {
 if (business?.stripe_id) {
   const accountLink = await stripe.accountLinks.create({
     account: business.stripe_id,
-    refresh_url: 'http://localhost:3000/reauth',
-    return_url: 'http://localhost:3000/business/dashboard',
+    refresh_url: `${getAppUrl()}/reauth`,
+    return_url: `${getAppUrl()}/business/dashboard`,
     type: 'account_onboarding',
   });
 
@@ -80,8 +80,8 @@ if (business?.stripe_id) {
     // Create onboarding link
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: 'http://localhost:3000/reauth',
-      return_url: 'http://localhost:3000/business/dashboard',
+      refresh_url: `${getAppUrl()}/reauth`,
+      return_url: `${getAppUrl()}/business/dashboard`,
       type: 'account_onboarding',
     });
 
