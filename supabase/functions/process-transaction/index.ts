@@ -17,73 +17,113 @@ serve(async (req) => {
          // For now, skip signature verification to avoid crypto issues
          const event = JSON.parse(body);
         
-        switch (event.type) {
-                     case 'payment_intent.succeeded':
-             const paymentIntent = event.data.object;
-            console.log('Payment succeeded:', paymentIntent.id);
+                switch (event.type) {
+                    case 'payment_intent.succeeded':
+          case 'checkout.session.completed':
+          case 'charge.succeeded':
+            let paymentData;
+            let paymentId;
+            
+            if (event.type === 'checkout.session.completed') {
+              paymentData = event.data.object;
+              paymentId = paymentData.payment_intent || paymentData.id;
+              console.log('Checkout session completed:', paymentData.id);
+              console.log('Checkout session metadata:', paymentData.metadata);
+              // For checkout sessions, we need to get the amount from the payment intent
+              if (paymentData.payment_intent) {
+                // We'll get the amount from the payment intent event instead
+                console.log('Checkout session has payment intent, skipping processing here');
+                return new Response(JSON.stringify({ received: true }), {
+                  headers: { 'Content-Type': 'application/json' },
+                  status: 200
+                });
+              }
+            } else if (event.type === 'charge.succeeded') {
+              paymentData = event.data.object;
+              paymentId = paymentData.payment_intent || paymentData.id;
+              console.log('Charge succeeded:', paymentData.id);
+              console.log('Charge metadata:', paymentData.metadata);
+              // For charges, we need to get the amount from the payment intent
+              if (paymentData.payment_intent) {
+                console.log('Charge has payment intent, skipping processing here');
+                return new Response(JSON.stringify({ received: true }), {
+                  headers: { 'Content-Type': 'application/json' },
+                  status: 200
+                });
+              }
+            } else {
+              paymentData = event.data.object;
+              paymentId = paymentData.id;
+              console.log('Payment intent succeeded:', paymentId);
+              console.log('Payment intent metadata:', paymentData.metadata);
+            }
             
                          // Note: Payment method saving is handled by Stripe automatically
              // when setup_future_usage is set in the checkout session
              console.log('Payment method saving handled by Stripe checkout');
             
             // Process the transaction
-            if (paymentIntent.metadata?.businessId && paymentIntent.metadata?.userId) {
-              const amount = paymentIntent.amount / 100; // Convert from cents
+            console.log('Payment data amount:', paymentData.amount);
+            console.log('Payment data metadata:', paymentData.metadata);
+            
+            if (paymentData.metadata?.businessId && paymentData.metadata?.userId) {
+              const amount = paymentData.amount / 100; // Convert from cents
+              console.log('Processing transaction with amount:', amount, 'businessId:', paymentData.metadata.businessId, 'userId:', paymentData.metadata.userId);
               const cashback = amount * 0.05;
               let referral_reward = 0;
               let referrer_id = null;
               
-                             // 1. Check for referral
-               const { data: user } = await supabase.from('users').select('referred_by').eq('id', paymentIntent.metadata.userId).single();
-               if (user?.referred_by) {
-                 referrer_id = user.referred_by;
-                 referral_reward = amount * 0.01;
-                 
-                 // Check if this payment has already been processed for referrer
-                 const { data: existingReferrerTransaction } = await supabase
-                   .from('transactions')
-                   .select('id')
-                   .eq('stripe_payment_intent_id', paymentIntent.id)
-                   .eq('referrer_id', referrer_id)
-                   .maybeSingle();
+                                           // 1. Check for referral
+              const { data: user } = await supabase.from('users').select('referred_by').eq('id', paymentData.metadata.userId).single();
+              if (user?.referred_by) {
+                referrer_id = user.referred_by;
+                referral_reward = amount * 0.01;
+                
+                // Check if this payment has already been processed for referrer
+                const { data: existingReferrerTransaction } = await supabase
+                  .from('transactions')
+                  .select('id')
+                  .eq('stripe_payment_intent_id', paymentId)
+                  .eq('referrer_id', referrer_id)
+                  .maybeSingle();
                  
                  if (!existingReferrerTransaction) {
-                   // Check if referrer wallet exists
-                   const { data: refWallet } = await supabase.from('wallets').select('*').eq('user_id', referrer_id).eq('business_id', paymentIntent.metadata.businessId).maybeSingle();
-                   
-                   if (refWallet) {
-                     // Update existing referrer wallet
-                     await supabase.from('wallets').update({
-                       balance_from_referrals: refWallet.balance_from_referrals + referral_reward
-                     }).eq('id', refWallet.id);
-                     console.log('Updated referrer wallet:', refWallet.id, 'added referral reward:', referral_reward);
-                   } else {
-                     // Create new referrer wallet
-                     const { data: newRefWallet } = await supabase.from('wallets').insert([
-                       {
-                         user_id: referrer_id,
-                         business_id: paymentIntent.metadata.businessId,
-                         balance: 0,
-                         balance_from_referrals: referral_reward
-                       }
-                     ]).select().single();
-                     console.log('Created new referrer wallet:', newRefWallet.id, 'with referral reward:', referral_reward);
+                                       // Check if referrer wallet exists
+                    const { data: refWallet } = await supabase.from('wallets').select('*').eq('user_id', referrer_id).eq('business_id', paymentData.metadata.businessId).maybeSingle();
+                    
+                    if (refWallet) {
+                      // Update existing referrer wallet
+                      await supabase.from('wallets').update({
+                        balance_from_referrals: refWallet.balance_from_referrals + referral_reward
+                      }).eq('id', refWallet.id);
+                      console.log('Updated referrer wallet:', refWallet.id, 'added referral reward:', referral_reward);
+                    } else {
+                      // Create new referrer wallet
+                      const { data: newRefWallet } = await supabase.from('wallets').insert([
+                        {
+                          user_id: referrer_id,
+                          business_id: paymentData.metadata.businessId,
+                          balance: 0,
+                          balance_from_referrals: referral_reward
+                        }
+                      ]).select().single();
+                      console.log('Created new referrer wallet:', newRefWallet.id, 'with referral reward:', referral_reward);
+                    }
+                                    } else {
+                     console.log('Skipping referrer wallet update - already processed for payment:', paymentId);
                    }
-                 } else {
-                   console.log('Skipping referrer wallet update - already processed for payment:', paymentIntent.id);
                  }
-               }
-              
+               
                              // 2. Get or create user's wallet
-               const { data: wallet } = await supabase.from('wallets').select('*').eq('user_id', paymentIntent.metadata.userId).eq('business_id', paymentIntent.metadata.businessId).maybeSingle();
+               const { data: wallet } = await supabase.from('wallets').select('*').eq('user_id', paymentData.metadata.userId).eq('business_id', paymentData.metadata.businessId).maybeSingle();
                let wallet_id = wallet?.id;
                
                if (!wallet_id) {
                  // Create new user wallet
                  const { data: newWallet } = await supabase.from('wallets').insert([
                    {
-                     user_id: paymentIntent.metadata.userId,
-                     business_id: paymentIntent.metadata.businessId,
+                     user_id: paymentData.metadata.userId,
+                     business_id: paymentData.metadata.businessId,
                      balance: cashback,
                      balance_from_referrals: 0
                    }
@@ -95,7 +135,7 @@ serve(async (req) => {
                  const { data: existingTransaction } = await supabase
                    .from('transactions')
                    .select('id')
-                   .eq('stripe_payment_intent_id', paymentIntent.id)
+                   .eq('stripe_payment_intent_id', paymentId)
                    .maybeSingle();
                  
                  if (!existingTransaction) {
@@ -103,37 +143,40 @@ serve(async (req) => {
                    const { data: allTransactions } = await supabase
                      .from('transactions')
                      .select('cashback_earned')
-                     .eq('user_id', paymentIntent.metadata.userId)
-                     .eq('business_id', paymentIntent.metadata.businessId);
-                   
+                     .eq('user_id', paymentData.metadata.userId)
+                     .eq('business_id', paymentData.metadata.businessId);
+
                    const totalCashback = allTransactions?.reduce((sum, t) => sum + t.cashback_earned, 0) || 0;
                    const newBalance = totalCashback + cashback; // Add current transaction's cashback
-                   
+
                    await supabase.from('wallets').update({
                      balance: newBalance
                    }).eq('id', wallet_id);
                    console.log('Recalculated wallet balance:', wallet_id, 'total cashback from transactions:', totalCashback, 'new transaction cashback:', cashback, 'new total:', newBalance);
-                   
+
                    // Log transaction only if it doesn't already exist
                    await supabase.from('transactions').insert([
                      {
-                       user_id: paymentIntent.metadata.userId,
-                       business_id: paymentIntent.metadata.businessId,
+                       user_id: paymentData.metadata.userId,
+                       business_id: paymentData.metadata.businessId,
                        wallet_id,
-                       order_id: paymentIntent.id, // Use payment intent ID as order_id
+                       order_id: paymentId, // Use payment intent ID as order_id
                        amount,
                        cashback_earned: cashback,
                        referrer_id,
                        referral_reward,
-                       stripe_payment_intent_id: paymentIntent.id
+                       stripe_payment_intent_id: paymentId
                      }
                    ]);
-                   
-                   console.log('Transaction processed for payment:', paymentIntent.id);
+
+                   console.log('Transaction processed for payment:', paymentId);
                  } else {
-                   console.log('Skipping wallet update and transaction creation - already processed for payment:', paymentIntent.id);
+                   console.log('Skipping wallet update and transaction creation - already processed for payment:', paymentId);
                  }
                }
+            } else {
+              console.log('Missing metadata - businessId or userId not found in payment data');
+              console.log('Available metadata keys:', Object.keys(paymentData.metadata || {}));
             }
             break;
             

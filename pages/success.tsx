@@ -194,10 +194,10 @@ export default function Success() {
                   <p className="text-green-800 font-semibold">Cashback Earned!</p>
                 </div>
                 <p className="text-green-700 text-sm mb-1">
-                  You earned <span className="font-bold">${transaction.cashback_earned.toFixed(2)}</span> cashback
+                  You earned <span className="font-bold">${(transaction.cashback_earned || 0).toFixed(2)}</span> cashback
                 </p>
                 <p className="text-green-600 text-xs">
-                  on your ${transaction.amount.toFixed(2)} purchase at {transaction.businesses?.business_name || 'this store'}
+                  on your ${(transaction.amount || 0).toFixed(2)} purchase at {transaction.businesses?.business_name || 'this store'}
                 </p>
               </div>
             ) : (

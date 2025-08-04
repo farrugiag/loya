@@ -329,15 +329,15 @@ export default function Dashboard() {
                       <div>
                         <p className="text-sm text-gray-600">Available Balance</p>
                         <p className="text-2xl font-bold text-[#21431E]">
-                          ${w.balance.toFixed(2)}
+                          ${(w.balance || 0).toFixed(2)}
                         </p>
                       </div>
                       
-                      {w.balance_from_referrals > 0 && (
+                      {(w.balance_from_referrals || 0) > 0 && (
                         <div>
                           <p className="text-sm text-gray-600">From Referrals</p>
                           <p className="text-lg font-semibold text-green-600">
-                            +${w.balance_from_referrals.toFixed(2)}
+                            +${(w.balance_from_referrals || 0).toFixed(2)}
                           </p>
                         </div>
                       )}
