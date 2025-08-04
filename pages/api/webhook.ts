@@ -82,6 +82,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log('Updated transaction for payment:', paymentIntent.id);
           }
         }
+
+        // Handle saving payment method if requested
+        if (paymentIntent.metadata?.savePaymentMethod === 'true' && paymentIntent.payment_method) {
+          try {
+            // Attach the payment method to the customer
+            await stripe.paymentMethods.attach(paymentIntent.payment_method, {
+              customer: paymentIntent.customer,
+            });
+            
+            // Set as default payment method
+            await stripe.customers.update(paymentIntent.customer, {
+              invoice_settings: {
+                default_payment_method: paymentIntent.payment_method,
+              },
+            });
+            
+            console.log('Payment method saved for customer:', paymentIntent.customer);
+          } catch (error) {
+            console.error('Failed to save payment method:', error);
+          }
+        }
         break;
 
       case 'payment_intent.payment_failed':

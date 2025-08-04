@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 import Image from 'next/image';
-import PaymentForm from '../../components/PaymentForm';
 
 interface Transaction {
   id: string;
@@ -31,7 +30,7 @@ export default function BusinessDashboard() {
   const [totalCashbackUsed, setTotalCashbackUsed] = useState<number | null>(null);
   const [referralEarnings, setReferralEarnings] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [showPaymentDemo, setShowPaymentDemo] = useState(false);
+  const [businessName, setBusinessName] = useState<string>('');
 
   useEffect(() => {
     const getSessionAndCheckStripe = async () => {
@@ -66,10 +65,10 @@ export default function BusinessDashboard() {
       // Fetch business (assuming business_id is auth.uid())
       const business_id = session.user.id;
 
-      // Fetch business Stripe status
+      // Fetch business Stripe status and name
       const { data: business, error: bizError } = await supabase
         .from('businesses')
-        .select('stripe_id, stripe_details_submitted, stripe_charges_enabled, stripe_payouts_enabled')
+        .select('stripe_id, stripe_details_submitted, stripe_charges_enabled, stripe_payouts_enabled, business_name')
         .eq('id', business_id)
         .single();
 
@@ -85,6 +84,7 @@ export default function BusinessDashboard() {
           business?.stripe_payouts_enabled
         );
         setStripeConnected(isStripeConnected);
+        setBusinessName(business?.business_name || 'Your Business');
         
         // If we have a stripe_id but status is incomplete, try to refresh from Stripe API
         if (business?.stripe_id && !isStripeConnected) {
@@ -201,7 +201,7 @@ export default function BusinessDashboard() {
                 className="w-32 h-16"
               />
               <div>
-                <p className="text-sm text-gray-600">Welcome back, {user.email}</p>
+                <p className="text-sm text-gray-600">Welcome back, {businessName}</p>
               </div>
             </div>
             <button
@@ -222,56 +222,11 @@ export default function BusinessDashboard() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stripe Connection Section */}
-        {stripeConnected ? (
-          <div className="mb-8">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center">
-                <div className="text-green-600 mr-3">✅</div>
-                <div>
-                  <p className="text-green-800 font-medium">Your Stripe account is connected</p>
-                  <p className="text-green-700 text-sm">You can now accept payments and process cashback</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Stripe Management</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-gray-600 text-sm mb-2">Access your Stripe Express Dashboard:</p>
-                  <a
-                    href="https://dashboard.stripe.com/test/express/acct_1Ronw2ELRkcaDPY5"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-                      <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-                    </svg>
-                    Open Express Dashboard
-                  </a>
-                </div>
-                <div>
-                  <p className="text-gray-600 text-sm mb-2">Test Payment (use test card):</p>
-                  <p className="text-xs text-gray-500 mb-2">
-                    <code className="bg-gray-100 px-2 py-1 rounded">4242 4242 4242 4242</code>
-                  </p>
-                  <button
-                    onClick={() => setShowPaymentDemo(true)}
-                    className="bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Demo Payment
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-8">
+              {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Stripe Connection Status */}
+          {!stripeConnected && (
+            <div className="mb-8">
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -400,41 +355,7 @@ export default function BusinessDashboard() {
         </div>
       </div>
 
-      {/* Payment Demo Modal */}
-      {showPaymentDemo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Test Payment</h2>
-              <button
-                onClick={() => setShowPaymentDemo(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-            <p className="text-gray-600 mb-4">
-              This is a demo payment. Use test card number: <code className="bg-gray-100 px-2 py-1 rounded">4242 4242 4242 4242</code>
-            </p>
-            
-            <PaymentForm
-              amount={10.00}
-              businessId={user.id}
-              userId={user.id} // Using business ID as user ID for demo
-              description="Demo payment test"
-              onSuccess={(paymentIntentId) => {
-                console.log('Payment successful:', paymentIntentId);
-                alert('Payment successful! Check your Stripe dashboard.');
-                setShowPaymentDemo(false);
-              }}
-              onError={(error) => {
-                console.error('Payment failed:', error);
-                alert(`Payment failed: ${error}`);
-              }}
-            />
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

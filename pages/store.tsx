@@ -28,6 +28,8 @@ export default function Store() {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
+  const [hasSavedPaymentMethods, setHasSavedPaymentMethods] = useState(false);
+  const [userName, setUserName] = useState<string>('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,6 +42,22 @@ export default function Store() {
         }
         setUser(user);
 
+        // Fetch user details for display name
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+
+        if (userData) {
+          const displayName = userData.first_name 
+            ? `${userData.first_name}${userData.last_name ? ` ${userData.last_name}` : ''}`
+            : user.email?.split('@')[0] || 'User';
+          setUserName(displayName);
+        } else {
+          setUserName(user.email?.split('@')[0] || 'User');
+        }
+
         // Fetch all products
         const response = await fetch('/api/products');
         const data = await response.json();
@@ -48,6 +66,17 @@ export default function Store() {
           setProducts(data.products || []);
         } else {
           console.error('Failed to fetch products:', data.error);
+        }
+
+        // Check if user has saved payment methods
+        try {
+          const paymentMethodsResponse = await fetch(`/api/payment-methods?userId=${user.id}`);
+          if (paymentMethodsResponse.ok) {
+            const paymentMethodsData = await paymentMethodsResponse.json();
+            setHasSavedPaymentMethods(paymentMethodsData.paymentMethods && paymentMethodsData.paymentMethods.length > 0);
+          }
+        } catch (error) {
+          console.error('Error fetching payment methods:', error);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -133,7 +162,7 @@ export default function Store() {
               />
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">Loya Store</h1>
-                <p className="text-sm text-gray-600">Browse products from our partner businesses</p>
+                <p className="text-sm text-gray-600">Welcome, {userName} browse products from our partner business</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -142,12 +171,6 @@ export default function Store() {
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 Dashboard
-              </button>
-              <button
-                onClick={() => router.push('/business/dashboard')}
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Business
               </button>
             </div>
           </div>
@@ -234,10 +257,10 @@ export default function Store() {
 
        {/* Purchase Modal */}
        {showPurchaseModal && selectedProduct && (
-         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
              <div className="flex items-center justify-between mb-4">
-               <h2 className="text-xl font-semibold text-gray-900">Complete Purchase</h2>
+               <h2 className="text-xl font-semibold text-gray-900">Complete purchase with Loya</h2>
                <button
                  onClick={() => {
                    setShowPurchaseModal(false);
@@ -257,20 +280,41 @@ export default function Store() {
              </div>
 
              <div className="mb-6">
-               <label className="flex items-center space-x-2">
-                 <input
-                   type="checkbox"
-                   checked={savePaymentMethod}
-                   onChange={(e) => setSavePaymentMethod(e.target.checked)}
-                   className="rounded border-gray-300 text-[#21431E] focus:ring-[#21431E]"
-                 />
-                 <span className="text-sm text-gray-700">
-                   Save payment method for future purchases
-                 </span>
-               </label>
-               <p className="text-xs text-gray-500 mt-1">
-                 Your payment information will be securely stored for faster checkout next time.
-               </p>
+               
+               {hasSavedPaymentMethods ? (
+                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                   <div className="flex items-center space-x-2">
+                     <span className="text-green-600">✅</span>
+                     <span className="text-sm text-green-800 font-medium">You have saved payment methods</span>
+                   </div>
+                   <p className="text-xs text-green-700 mt-1">
+                     Your payment information is already saved for faster checkout.
+                   </p>
+                   <button
+                     onClick={() => router.push('/user/dashboard')}
+                     className="text-xs text-green-600 hover:text-green-800 underline mt-2"
+                   >
+                     View saved payment methods →
+                   </button>
+                 </div>
+               ) : (
+                 <>
+                   <label className="flex items-center space-x-2">
+                     <input
+                       type="checkbox"
+                       checked={savePaymentMethod}
+                       onChange={(e) => setSavePaymentMethod(e.target.checked)}
+                       className="rounded border-gray-300 text-[#21431E] focus:ring-[#21431E]"
+                     />
+                     <span className="text-sm text-gray-700">
+                       Save payment method for faster checkout
+                     </span>
+                   </label>
+                   <p className="text-xs text-gray-500 mt-1">
+                     Your payment information will be securely stored by Stripe for future purchases. You can manage saved payment methods in your account settings.
+                   </p>
+                 </>
+               )}
              </div>
              
              <div className="flex space-x-3">
@@ -289,7 +333,7 @@ export default function Store() {
                  disabled={purchasing === selectedProduct.stripe_product_id}
                  className="flex-1 bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                >
-                 {purchasing === selectedProduct.stripe_product_id ? 'Processing...' : 'Proceed to Payment'}
+                 {purchasing === selectedProduct.stripe_product_id ? 'Processing...' : 'Pay with Loya'}
                </button>
              </div>
            </div>

@@ -87,6 +87,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Create checkout session with destination charge
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
+      // Customize payment methods - only show card and Link
+      payment_method_types: ['card', 'link'],
       line_items: [
         {
           price_data: {
@@ -110,6 +112,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           businessId: product.business_id,
           userId: userId,
         },
+        // This will save the payment method for future use
         setup_future_usage: savePaymentMethod ? 'off_session' : undefined,
       },
       mode: 'payment',
@@ -119,7 +122,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         address: 'auto',
         name: 'auto',
       },
-      payment_method_collection: savePaymentMethod ? 'always' : 'if_required',
+      // Customize the checkout page
+      billing_address_collection: 'auto',
+      allow_promotion_codes: false,
       metadata: {
         productId: productId,
         businessId: product.business_id,

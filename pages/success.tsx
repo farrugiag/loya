@@ -9,6 +9,7 @@ export default function Success() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
+  const [transaction, setTransaction] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,9 +19,108 @@ export default function Success() {
       // In a real app, you'd verify the session with Stripe
       // For now, we'll just show a success message
       setSession({ id: session_id });
-      setLoading(false);
+      
+      // Fetch transaction data to show cashback
+      fetchTransactionData(session_id as string);
     }
   }, [router.query]);
+
+  const fetchTransactionData = async (sessionId: string) => {
+    try {
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+             // Fetch the most recent transaction for this user (since session ID and payment intent ID are different)
+       let { data: transactionData, error } = await supabase
+         .from('transactions')
+         .select(`
+           id,
+           amount,
+           cashback_earned,
+           created_at,
+           businesses(business_name)
+         `)
+         .eq('user_id', user.id)
+         .order('created_at', { ascending: false })
+         .limit(1)
+         .maybeSingle();
+
+              console.log('Most recent transaction for user:', transactionData);
+
+       // Check if the transaction was created recently (within last 5 minutes)
+       if (transactionData) {
+         const transactionTime = new Date(transactionData.created_at);
+         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+         
+         if (transactionTime < fiveMinutesAgo) {
+           console.log('Transaction is too old, treating as not found');
+           transactionData = null;
+         }
+       }
+
+       if (error || !transactionData) {
+        console.log('No transaction found yet, webhook may still be processing:', error);
+        
+        // Debug: Let's see what transactions exist for this user
+        const { data: allUserTransactions } = await supabase
+          .from('transactions')
+          .select('id, order_id, stripe_payment_intent_id, amount, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        console.log('Recent transactions for user:', allUserTransactions);
+        console.log('Looking for session ID:', sessionId);
+        
+        // Don't show error, just continue without transaction data
+        setLoading(false);
+        return;
+      }
+
+      console.log('Transaction data found:', transactionData);
+      setTransaction(transactionData);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching transaction:', err);
+      setLoading(false);
+    }
+  };
+
+  // Poll for transaction data if not found initially
+  useEffect(() => {
+    if (session?.id && !transaction && !loading) {
+      let pollInterval: NodeJS.Timeout;
+      let timeout: NodeJS.Timeout;
+      
+      const startPolling = () => {
+        pollInterval = setInterval(async () => {
+          await fetchTransactionData(session.id);
+        }, 2000); // Check every 2 seconds
+
+        // Stop polling after 30 seconds
+        timeout = setTimeout(() => {
+          if (pollInterval) {
+            clearInterval(pollInterval);
+          }
+        }, 30000);
+      };
+
+      startPolling();
+
+      return () => {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+        }
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+      };
+    }
+  }, [session?.id, loading]); // Removed transaction from dependencies
 
   if (loading) {
     return (
@@ -84,6 +184,34 @@ export default function Success() {
             <p className="text-gray-600 text-sm">
               Thank you for your purchase. Your order has been processed successfully.
             </p>
+            
+            {/* Cashback Information */}
+            {console.log('Rendering cashback section, transaction:', transaction)}
+            {transaction ? (
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-green-600 text-lg mr-2">🎉</span>
+                  <p className="text-green-800 font-semibold">Cashback Earned!</p>
+                </div>
+                <p className="text-green-700 text-sm mb-1">
+                  You earned <span className="font-bold">${transaction.cashback_earned.toFixed(2)}</span> cashback
+                </p>
+                <p className="text-green-600 text-xs">
+                  on your ${transaction.amount.toFixed(2)} purchase at {transaction.businesses?.business_name || 'this store'}
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-blue-600 text-lg mr-2">⏳</span>
+                  <p className="text-blue-800 font-semibold">Processing Cashback</p>
+                </div>
+                <p className="text-blue-700 text-sm">
+                  Your cashback is being processed and will appear in your wallet shortly.
+                </p>
+              </div>
+            )}
+            
             {session && (
               <p className="text-xs text-gray-500 mt-2">
                 Session ID: {session.id}

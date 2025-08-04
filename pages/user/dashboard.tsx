@@ -11,6 +11,7 @@ type Wallet = {
   balance: number;
   balance_from_referrals: number;
   business_name: string;
+  business_website?: string;
 };
 
 type Transaction = {
@@ -21,8 +22,21 @@ type Transaction = {
   business_name: string;
 };
 
+type PaymentMethod = {
+  id: string;
+  type: string;
+  card: {
+    brand: string;
+    last4: string;
+    expMonth: number;
+    expYear: number;
+  } | null;
+  created: number;
+};
+
 interface BusinessData {
   business_name: string;
+  website?: string;
 }
 
 export default function Dashboard() {
@@ -30,6 +44,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -95,7 +110,7 @@ export default function Dashboard() {
 
       const { data: walletData } = await supabase
         .from('wallets')
-        .select('id, balance, balance_from_referrals, business_id, businesses(business_name)')
+        .select('id, balance, balance_from_referrals, business_id, businesses(business_name, website)')
         .eq('user_id', user.id);
 
       const { data: transactionData } = await supabase
@@ -117,7 +132,8 @@ export default function Dashboard() {
         id: w.id,
         balance: w.balance,
         balance_from_referrals: w.balance_from_referrals,
-        business_name: (w.businesses as unknown as BusinessData)?.business_name ?? 'Unknown Store'
+        business_name: (w.businesses as unknown as BusinessData)?.business_name ?? 'Unknown Store',
+        business_website: (w.businesses as unknown as BusinessData)?.website
       }));
 
       const formattedTransactions: Transaction[] = (transactionData ?? []).map(t => ({
@@ -127,6 +143,17 @@ export default function Dashboard() {
         created_at: t.created_at,
         business_name: (t.businesses as unknown as BusinessData)?.business_name ?? 'Unknown Store'
       }));
+
+      // Fetch saved payment methods
+      try {
+        const paymentMethodsResponse = await fetch(`/api/payment-methods?userId=${user.id}`);
+        if (paymentMethodsResponse.ok) {
+          const paymentMethodsData = await paymentMethodsResponse.json();
+          setPaymentMethods(paymentMethodsData.paymentMethods || []);
+        }
+      } catch (error) {
+        console.error('Error fetching payment methods:', error);
+      }
 
       setWallets(formattedWallets);
       setTransactions(formattedTransactions);
@@ -331,6 +358,28 @@ export default function Dashboard() {
                         </p>
                       </div>
                     )}
+
+                    {/* Visit Shop Button */}
+                    {!isEmptyPlaceholder && (
+                      <div className="mt-4">
+                        {w.business_website ? (
+                          <a
+                            href={w.business_website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <span>🛍️</span>
+                            <span>Visit Shop</span>
+                          </a>
+                        ) : (
+                          <div className="w-full bg-gray-100 text-gray-500 font-medium py-2 px-4 rounded-lg flex items-center justify-center space-x-2">
+                            <span>🏪</span>
+                            <span>No website available</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -381,6 +430,60 @@ export default function Dashboard() {
               <p className="text-gray-600">
                 Your transaction history will appear here once you make your first purchase.
               </p>
+            </div>
+          )}
+        </div>
+
+        {/* Payment Methods Section */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Saved Payment Methods</h2>
+          {paymentMethods.length > 0 ? (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              {paymentMethods.map((pm, index) => (
+                <div
+                  key={pm.id}
+                  className={`flex items-center justify-between p-4 ${
+                    index !== paymentMethods.length - 1 ? 'border-b border-gray-100' : ''
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <span className="text-gray-600 text-lg">💳</span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {pm.card?.brand ? `${pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1)} •••• ${pm.card.last4}` : 'Payment Method'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Expires {pm.card?.expMonth}/{pm.card?.expYear}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">
+                      {new Date(pm.created * 1000).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <div className="text-4xl mb-4">💳</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No saved payment methods</h3>
+              <p className="text-gray-600 mb-4">
+                Save your payment information during checkout for faster future purchases.
+              </p>
+              <button
+                onClick={() => router.push('/store')}
+                className="bg-[#21431E] hover:bg-[#1a3618] text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Go to Store
+              </button>
             </div>
           )}
         </div>
