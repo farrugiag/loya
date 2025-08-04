@@ -1,14 +1,11 @@
-import { useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+import { useState, useEffect } from 'react';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 import {
   Elements,
   CardElement,
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-
-// Load Stripe outside of component to avoid recreating on every render
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface PaymentFormProps {
   amount: number;
@@ -137,6 +134,66 @@ function CheckoutForm({ amount, businessId, userId, description, onSuccess, onEr
 }
 
 export default function PaymentForm(props: PaymentFormProps) {
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    
+    if (!publishableKey) {
+      setError('Stripe publishable key is not configured');
+      return;
+    }
+
+    if (!publishableKey.startsWith('pk_')) {
+      setError('Invalid Stripe publishable key format');
+      return;
+    }
+
+    try {
+      const promise = loadStripe(publishableKey);
+      setStripePromise(promise);
+    } catch (err) {
+      setError('Failed to load Stripe');
+      console.error('Stripe loading error:', err);
+    }
+  }, []);
+
+  if (error) {
+    return (
+      <div style={{ 
+        maxWidth: '400px', 
+        margin: '0 auto', 
+        padding: '1rem',
+        backgroundColor: '#fef2f2',
+        border: '1px solid #fecaca',
+        borderRadius: '4px',
+        color: '#dc2626'
+      }}>
+        <p><strong>Stripe Error:</strong> {error}</p>
+        <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+          Please check your environment variables and restart the development server.
+        </p>
+      </div>
+    );
+  }
+
+  if (!stripePromise) {
+    return (
+      <div style={{ 
+        maxWidth: '400px', 
+        margin: '0 auto', 
+        padding: '1rem',
+        backgroundColor: '#f3f4f6',
+        border: '1px solid #d1d5db',
+        borderRadius: '4px',
+        color: '#374151'
+      }}>
+        <p>Loading Stripe...</p>
+      </div>
+    );
+  }
+
   return (
     <Elements stripe={stripePromise}>
       <CheckoutForm {...props} />

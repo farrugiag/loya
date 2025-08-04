@@ -17,39 +17,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { merchantId } = req.body;
 
-if (!merchantId) {
-  return res.status(400).json({ error: 'Missing merchantId' });
-}
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Missing merchantId' });
+    }
 
-const { data: business, error } = await supabase
-  .from('businesses')
-  .select('business_name, email, website, support_email, stripe_id')
-  .eq('id', merchantId)
-  .single();
+    const { data: business, error } = await supabase
+      .from('businesses')
+      .select('business_name, email, website, support_email, stripe_id')
+      .eq('id', merchantId)
+      .single();
 
-if (error) {
-  console.warn('Business fetch failed:', error.message);
-}
+    if (error) {
+      console.warn('Business fetch failed:', error.message);
+    }
 
-// ✅ Reuse account if already created
-if (business?.stripe_id) {
-  const accountLink = await stripe.accountLinks.create({
-    account: business.stripe_id,
-    refresh_url: `${getAppUrl()}/reauth`,
-    return_url: `${getAppUrl()}/business/dashboard`,
-    type: 'account_onboarding',
-  });
+    // ✅ Reuse account if already created
+    if (business?.stripe_id) {
+      const accountLink = await stripe.accountLinks.create({
+        account: business.stripe_id,
+        refresh_url: `${getAppUrl()}/reauth`,
+        return_url: `${getAppUrl()}/business/dashboard`,
+        type: 'account_onboarding',
+      });
 
-  return res.status(200).json({
-    accountId: business.stripe_id,
-    onboardingUrl: accountLink.url,
-  });
-}
+      return res.status(200).json({
+        accountId: business.stripe_id,
+        onboardingUrl: accountLink.url,
+      });
+    }
 
-
-    // Create Stripe account
+    // Create Stripe account with controller properties (platform responsible for pricing and fees)
     const account = await stripe.accounts.create({
-      type: 'express',
       country: 'US',
       email: business?.email || undefined,
       capabilities: {
@@ -61,6 +59,20 @@ if (business?.stripe_id) {
         url: business?.website || undefined,
         support_email: business?.support_email || business?.email || undefined,
         product_description: 'Loyalty-enabled e-commerce store',
+      },
+      controller: {
+        // Platform is responsible for pricing and fee collection
+        fees: {
+          payer: 'application' as const
+        },
+        // Platform is responsible for losses / refunds / chargebacks
+        losses: {
+          payments: 'application' as const
+        },
+        // Give them access to the express dashboard for management
+        stripe_dashboard: {
+          type: 'express' as const
+        }
       },
       metadata: {
         merchantId,

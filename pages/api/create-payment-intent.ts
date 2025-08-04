@@ -34,11 +34,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Business has not completed Stripe onboarding' });
     }
 
+    // Calculate fees
+    const platformFeeAmount = Math.round(amount * 10); // 10% platform fee
+    const cashbackAmount = amount * 0.05; // 5% cashback
+
     // Create payment intent with application fee (platform fee)
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
       currency: 'usd',
-      application_fee_amount: Math.round(amount * 10), // 10% platform fee
+      application_fee_amount: platformFeeAmount,
       transfer_data: {
         destination: business.stripe_id,
       },
@@ -48,6 +52,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: description || 'Loya transaction',
       },
     });
+
+    // Create transaction record in database
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: userId,
+        business_id: businessId,
+        amount: amount,
+        stripe_payment_intent_id: paymentIntent.id,
+        status: 'pending',
+        platform_fee_amount: platformFeeAmount / 100, // Convert back to dollars
+        cashback_amount: cashbackAmount,
+        description: description || 'Loya transaction'
+      });
+
+    if (transactionError) {
+      console.error('Failed to create transaction record:', transactionError);
+      // Don't fail the request, but log the error
+    }
 
     res.status(200).json({
       clientSecret: paymentIntent.client_secret,

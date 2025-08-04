@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useRouter } from 'next/router';
-import useRoleGuard from '../../hooks/useRoleGuard';
 import { User } from '@supabase/supabase-js';
 import Image from 'next/image';
 
@@ -27,7 +26,6 @@ interface BusinessData {
 }
 
 export default function Dashboard() {
-  const { checking, blocked, logoutAndReload } = useRoleGuard('user');
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -37,8 +35,6 @@ export default function Dashboard() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (checking || blocked) return;
-
     const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -46,16 +42,53 @@ export default function Dashboard() {
         return;
       }
 
-      // Prevent business users from accessing this dashboard
-      const { data: bizCheck } = await supabase
-        .from('businesses')
+
+
+      // Check if user exists in users table, if not create them
+      const { data: existingUser } = await supabase
+        .from('users')
         .select('id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (bizCheck) {
-        logoutAndReload();
-        return;
+      if (!existingUser) {
+        // Create new user
+        const userMeta = user.user_metadata;
+        let first = localStorage.getItem('pending_first_name') || '';
+        let last = localStorage.getItem('pending_last_name') || '';
+
+        if (!first && userMeta.full_name) {
+          const parts = userMeta.full_name.trim().split(' ');
+          first = parts[0];
+          last = parts.slice(1).join(' ') || '';
+        }
+
+        // Generate referral code
+        const base = first.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || user.email!.split('@')[0];
+        let code = base;
+        let counter = 1;
+
+        while (true) {
+          const { count } = await supabase
+            .from('users')
+            .select('id', { count: 'exact', head: true })
+            .eq('referral_code', code);
+
+          if (!count) break;
+          counter++;
+          code = `${base}${counter}`;
+        }
+
+        await supabase.from('users').upsert({
+          id: user.id,
+          email: user.email!,
+          first_name: first,
+          last_name: last,
+          referral_code: code,
+        }, { onConflict: 'id' });
+
+        localStorage.removeItem('pending_first_name');
+        localStorage.removeItem('pending_last_name');
       }
 
       setUser(user);
@@ -114,21 +147,21 @@ export default function Dashboard() {
     if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
       window.history.replaceState({}, document.title, '/user/dashboard');
     }
-  }, [checking, blocked, router, logoutAndReload]);
+  }, [router]);
 
   const handleLogout = async () => {
     setSigningOut(true);
+    console.log('🚪 Dashboard logout requested');
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Sign out error:', error);
-        // Still redirect even if there's an error
-      }
-      router.push('/user/login');
+      // Fast logout: just sign out and redirect
+      await supabase.auth.signOut();
+      router.replace('/user/login');
     } catch (error) {
-      console.error('Sign out failed:', error);
-      // Still redirect even if there's an error
+      console.error('❌ Dashboard logout failed:', error);
+      // Fallback: force redirect
       router.push('/user/login');
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -147,34 +180,13 @@ export default function Dashboard() {
     }
   };
 
-  if (checking) {
+  // Simple loading state while fetching data
+  if (loading && !user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking access...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (blocked) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto p-8 text-center">
-          <div className="mb-6">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Access Denied</h2>
-            <p className="text-gray-600 mb-6">
-              You are not authorized to access the user dashboard.
-            </p>
-            <button
-              onClick={logoutAndReload}
-              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              Log out
-            </button>
-          </div>
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -184,8 +196,8 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your wallet...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#21431E] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
     );

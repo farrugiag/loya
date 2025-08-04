@@ -19,10 +19,11 @@ export default function SignUp() {
   const handleGoogleSignUp = async () => {
     try {
       setLoading(true)
+      const redirectTo = `${getAppUrl()}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${getAppUrl()}/callback?role=user`
+          redirectTo
         }
       })
       if (error) throw error
@@ -48,7 +49,7 @@ export default function SignUp() {
       email,
       password,
       options: {
-        emailRedirectTo: `${getAppUrl()}/callback?role=user`,
+        emailRedirectTo: `${getAppUrl()}/user/login`,
         data: {
           first_name: firstName,
           last_name: lastName,

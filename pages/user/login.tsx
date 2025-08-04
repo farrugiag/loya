@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/router'
-import useRoleGuard from '../../hooks/useRoleGuard'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getAppUrl } from '../../lib/utils'
 
 export default function Login() {
-  const { checking, blocked, logoutAndReload } = useRoleGuard('user')
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -15,31 +13,47 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Simple session check - if already logged in, redirect to dashboard
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        router.push('/callback?role=user')
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.replace('/user/dashboard')
       }
-    })
-
-    return () => {
-      subscription.unsubscribe()
     }
+    checkSession()
   }, [router])
 
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true)
-      const { error } = await supabase.auth.signInWithOAuth({
+      setError('')
+      
+      console.log('🔗 Starting Google OAuth...')
+      
+      // Use the callback page for proper OAuth handling
+      const redirectTo = 'http://localhost:3000/auth/callback'
+      console.log('🔗 Starting Google OAuth with redirect:', redirectTo)
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${getAppUrl()}/callback?role=user`
+          redirectTo
         }
       })
-      if (error) throw error
+      
+      console.log('🔧 OAuth response data:', data)
+      console.log('🔧 OAuth response error:', error)
+      
+      if (error) {
+        console.error('Google sign in error:', error)
+        setError(`Failed to sign in with Google: ${error.message}`)
+      } else {
+        console.log('✅ Google OAuth initiated successfully')
+      }
     } catch (error) {
-      setError('Failed to sign in with Google')
       console.error('Google sign in error:', error)
+      setError('Failed to sign in with Google')
     } finally {
       setLoading(false)
     }
@@ -55,49 +69,23 @@ export default function Login() {
     try {
       setLoading(true)
       setError('')
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
-      if (error) throw error
+      
+      if (error) {
+        setError(error.message)
+      } else {
+        // Email sign-in successful - redirect to callback to determine role
+        router.push('/auth/callback')
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'Failed to sign in')
     } finally {
       setLoading(false)
     }
-  }
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking session...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (blocked) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto p-8 text-center">
-          <div className="mb-6">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">You&apos;re already signed in</h2>
-            <p className="text-gray-600 mb-6">
-              You&apos;re currently logged in as a <strong>business</strong>. Please log out before accessing the user login.
-            </p>
-            <button
-              onClick={logoutAndReload}
-              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              Log out
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -124,7 +112,7 @@ export default function Login() {
             <p className="text-gray-600 text-sm font-sans">Log in to your Loya account</p>
           </div>
 
-          {/* Login Options */}
+          {/* Google OAuth Button */}
           <div className="space-y-2 mb-4">
             <button
               onClick={handleGoogleSignIn}

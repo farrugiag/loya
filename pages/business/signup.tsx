@@ -29,7 +29,7 @@ export default function BusinessSignUp() {
       email,
       password,
       options: {
-        emailRedirectTo: `${getAppUrl()}/callback?role=business`,
+        emailRedirectTo: `${getAppUrl()}/business/login`,
         data: {
           role: 'business',
           business_name: businessName,
@@ -43,6 +43,27 @@ export default function BusinessSignUp() {
       setLoading(false)
       return
     }
+
+    // Create business record immediately after signup
+    try {
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .insert({
+          id: authData.user.id,
+          email: email,
+          business_name: businessName,
+        })
+
+      if (businessError) {
+        console.error('Failed to create business record:', businessError)
+        // Don't fail the signup, but log the error
+      } else {
+        console.log('Business record created successfully')
+      }
+    } catch (err) {
+      console.error('Error creating business record:', err)
+    }
+
     setSuccess(true)
     setLoading(false)
   }
@@ -102,7 +123,7 @@ export default function BusinessSignUp() {
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
               <p className="text-green-800 text-sm">
-                Account created! Please check your email to confirm and log in.
+                Business account created! Please check your email to confirm and log in.
               </p>
               <p className="text-green-700 text-xs mt-1">
                 If you don&apos;t see it, be sure to check your spam or junk folder.
@@ -148,8 +169,6 @@ export default function BusinessSignUp() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans">Better way to pay.</h1>
             <p className="text-gray-600 text-sm font-sans">Create your business account</p>
           </div>
-
-
 
           {/* Sign Up Form */}
           <form onSubmit={handleSignUp} className="space-y-3">

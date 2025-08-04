@@ -61,13 +61,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Handle successful payments
         const paymentIntent = event.data.object;
         console.log('Payment succeeded:', paymentIntent.id);
+        
+        // Update transaction status and calculate cashback
+        if (paymentIntent.metadata?.businessId && paymentIntent.metadata?.userId) {
+          const amount = paymentIntent.amount / 100; // Convert from cents
+          const cashbackAmount = amount * 0.05; // 5% cashback
+          
+          const { error: updateError } = await supabase
+            .from('transactions')
+            .update({
+              status: 'completed',
+              cashback_amount: cashbackAmount,
+              updated_at: new Date().toISOString()
+            })
+            .eq('stripe_payment_intent_id', paymentIntent.id);
+
+          if (updateError) {
+            console.error('Failed to update transaction:', updateError);
+          } else {
+            console.log('Updated transaction for payment:', paymentIntent.id);
+          }
+        }
         break;
 
       case 'payment_intent.payment_failed':
         // Handle failed payments
         const failedPayment = event.data.object;
         console.log('Payment failed:', failedPayment.id);
+        
+        // Update transaction status to failed
+        const { error: failError } = await supabase
+          .from('transactions')
+          .update({
+            status: 'failed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('stripe_payment_intent_id', failedPayment.id);
+
+        if (failError) {
+          console.error('Failed to update failed transaction:', failError);
+        }
         break;
+
+
 
       default:
         console.log(`Unhandled event type: ${event.type}`);

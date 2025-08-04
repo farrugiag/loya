@@ -1,27 +1,26 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/router'
-import useRoleGuard from '../../hooks/useRoleGuard'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export default function BusinessLogin() {
   const router = useRouter()
-  const { checking, blocked, logoutAndReload } = useRoleGuard('business')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Redirect to callback after login
+  // Simple session check - if already logged in, redirect to dashboard
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        router.push('/callback?role=business')
+        router.replace('/business/dashboard')
       }
-    })
-    return () => subscription.unsubscribe()
+    }
+    checkSession()
   }, [router])
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
@@ -34,49 +33,23 @@ export default function BusinessLogin() {
     try {
       setLoading(true)
       setError('')
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
-      if (error) throw error
+      
+      if (error) {
+        setError(error.message)
+      } else {
+        // Email sign-in successful - redirect to business dashboard
+        router.push('/business/dashboard')
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'Failed to sign in')
     } finally {
       setLoading(false)
     }
-  }
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking session...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (blocked) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto p-8 text-center">
-          <div className="mb-6">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Already signed in</h2>
-            <p className="text-gray-600 mb-6">
-              You&apos;re signed in as a <strong>user</strong>. Please log out first.
-            </p>
-            <button
-              onClick={logoutAndReload}
-              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-            >
-              Log out
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -102,8 +75,6 @@ export default function BusinessLogin() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1 font-sans">Better way to pay.</h1>
             <p className="text-gray-600 text-sm font-sans">Log in to your business account</p>
           </div>
-
-
 
           {/* Email/Password Form */}
           <form onSubmit={handleEmailSignIn} className="space-y-3">
