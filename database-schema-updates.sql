@@ -67,4 +67,20 @@ $$ language 'plpgsql';
 
 -- Create trigger for products table
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add unique constraint to prevent duplicate transactions
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'unique_stripe_payment_intent_id'
+    ) THEN
+        ALTER TABLE transactions ADD CONSTRAINT unique_stripe_payment_intent_id UNIQUE (stripe_payment_intent_id);
+    END IF;
+END $$;
+
+-- Add website field to businesses table for merchant websites
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS website TEXT;
+-- Add comment to document the field
+COMMENT ON COLUMN businesses.website IS 'Merchant website URL for customer visits'; 
